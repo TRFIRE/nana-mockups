@@ -1,33 +1,29 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nanã Studio Mockups</title>
-    <!-- Tailwind CSS para o estilo -->
+    <title>Nanã Studio Mockups - Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Configuração do PWA Básica -->
     <meta name="theme-color" content="#f43f5e">
-    <link rel="apple-touch-icon" href="https://lucide.dev/favicon.ico">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        .animate-bounce-slow { animation: bounce 2s infinite; }
     </style>
 </head>
-<body class="bg-rose-50">
+<body class="bg-rose-50 min-h-screen">
     <div id="root"></div>
 
-    <!-- Importando React e Lucide Icons via ESM -->
     <script type="module">
-        import React, { useState, useRef, useEffect } from 'https://esm.sh/react@18.2.0';
+        import React, { useState, useRef } from 'https://esm.sh/react@18.2.0';
         import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
         import { 
             Upload, Image as ImageIcon, Sparkles, Download, AlertCircle, 
-            RefreshCw, Loader2, Info, Wallpaper, Key 
+            RefreshCw, Loader2, Info, Wallpaper, Settings, ExternalLink 
         } from 'https://esm.sh/lucide-react@0.244.0';
 
-        const apiKey = "AIzaSyC_Nx3UxDx9ALysuIJZyZ2dUCEb5JATR2g"; // Sua chave API definida
+        // Chave vazia permite que o ambiente de teste funcione automaticamente aqui.
+        const apiKey = ""; 
 
         const fileToBase64 = (file) => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -37,26 +33,22 @@
                 img.src = reader.result;
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 1024;
-                    const MAX_HEIGHT = 1024;
+                    const MAX_SIZE = 1024;
                     let width = img.width;
                     let height = img.height;
-
                     if (width > height) {
-                        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                        if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
                     } else {
-                        if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                        if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
                     }
                     canvas.width = width;
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-                    resolve(canvas.toDataURL(mimeType, 0.85));
+                    resolve(canvas.toDataURL('image/jpeg', 0.85));
                 };
-                img.onerror = () => resolve(reader.result);
             };
-            reader.onerror = (error) => reject(error);
+            reader.onerror = reject;
         });
 
         const fetchWithRetry = async (url, options, retries = 5) => {
@@ -66,7 +58,7 @@
                     const response = await fetch(url, options);
                     if (!response.ok) {
                         const errText = await response.text();
-                        throw new Error(`Erro na API (${response.status}): ${errText}`);
+                        throw new Error(`Erro na API (${response.status})`);
                     }
                     return await response.json();
                 } catch (error) {
@@ -84,6 +76,7 @@
             const [isGenerating, setIsGenerating] = useState(false);
             const [error, setError] = useState(null);
             const [customKey, setCustomKey] = useState("");
+            const [showSettings, setShowSettings] = useState(false);
 
             const backgroundInputRef = useRef(null);
             const mockupInputRef = useRef(null);
@@ -96,26 +89,25 @@
                 try {
                     const dataUrl = await fileToBase64(file);
                     const matches = dataUrl.match(/^data:(.+);base64,(.+)$/);
-                    if (matches) {
-                        const fileData = { mimeType: matches[1], data: matches[2], previewUrl: dataUrl };
-                        if (type === 'background') setBackground(fileData);
-                        if (type === 'mockup') setMockupBase(fileData);
-                        if (type === 'artwork') setArtwork(fileData);
-                        setResultImage(null);
-                    }
+                    const fileData = { mimeType: matches[1], data: matches[2], previewUrl: dataUrl };
+                    if (type === 'background') setBackground(fileData);
+                    if (type === 'mockup') setMockupBase(fileData);
+                    if (type === 'artwork') setArtwork(fileData);
+                    setResultImage(null);
                 } catch (err) { setError("Erro ao processar imagem."); }
             };
 
             const generateMockup = async () => {
                 if (!mockupBase || !artwork) {
-                    setError("Carregue a Caneca e a Estampa.");
+                    setError("Carregue a Caneca e a Estampa primeiro.");
                     return;
                 }
                 setIsGenerating(true);
                 setError(null);
+
                 const promptText = background 
-                    ? `I am providing 3 images: Image 1: Background/Scene. Image 2: Mug mockup base. Image 3: Artwork design. Tasks: 1. Composite the Mug Mockup (Image 2) over the Background (Image 1) with realistic shadows. 2. Apply the Artwork (Image 3) onto the mug as a realistic sublimation print.`
-                    : `Apply the Artwork onto the mug base as a realistic sublimation print. Match perspective and lighting.`;
+                    ? "Composite the mug from Image 2 over the background in Image 1. Then apply the design from Image 3 onto the mug as a realistic sublimation print. Match lighting and perspective."
+                    : "Apply the design from Image 2 onto the mug in Image 1 as a realistic sublimation print. Match perspective, lighting, and surface texture perfectly.";
                 
                 const imageParts = [];
                 if (background) imageParts.push({ inlineData: { mimeType: background.mimeType, data: background.data } });
@@ -123,97 +115,129 @@
                 imageParts.push({ inlineData: { mimeType: artwork.mimeType, data: artwork.data } });
 
                 try {
-                    const key = customKey || apiKey;
-                    if (!key) throw new Error("API Key ausente. Insira uma chave Gemini.");
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${key}`;
-                    const response = await fetchWithRetry(url, {
+                    const effectiveKey = customKey || apiKey;
+                    const modelName = "gemini-2.5-flash-image-preview";
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${effectiveKey}`;
+                    
+                    const result = await fetchWithRetry(url, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ contents: [{ parts: [{ text: promptText }, ...imageParts] }], generationConfig: { responseModalities: ["TEXT", "IMAGE"] } })
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: promptText }, ...imageParts] }],
+                            generationConfig: { responseModalities: ["TEXT", "IMAGE"] }
+                        })
                     });
-                    const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
-                    if (imagePart) setResultImage(`data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`);
-                    else throw new Error("A IA não retornou imagem.");
-                } catch (err) { setError(err.message); } finally { setIsGenerating(false); }
+
+                    const imagePart = result.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+                    if (imagePart) {
+                        setResultImage(`data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`);
+                    } else {
+                        throw new Error("A IA não retornou uma imagem. Tente novamente.");
+                    }
+                } catch (err) {
+                    setError("Erro ao gerar mockup. Se estiver no GitHub, certifique-se de configurar a API Key correta nas configurações.");
+                } finally {
+                    setIsGenerating(false);
+                }
             };
 
             return React.createElement('div', { className: 'min-h-screen pb-12' }, [
                 // Header
-                React.createElement('header', { className: 'bg-white shadow-sm border-b border-rose-100 sticky top-0 z-10 p-4 mb-8' }, 
+                React.createElement('header', { className: 'bg-white shadow-md border-b border-rose-100 sticky top-0 z-10 p-4 mb-6' }, 
                     React.createElement('div', { className: 'max-w-6xl mx-auto flex items-center justify-between' }, [
                         React.createElement('div', { className: 'flex items-center gap-2' }, [
                             React.createElement(Sparkles, { className: 'text-rose-500 w-6 h-6' }),
-                            React.createElement('h1', { className: 'text-xl font-bold text-rose-600' }, 'Nanã Studio Mockups')
-                        ])
+                            React.createElement('h1', { className: 'text-xl font-bold text-rose-600' }, 'Nanã Studio Pro')
+                        ]),
+                        React.createElement('button', { 
+                            onClick: () => setShowSettings(!showSettings),
+                            className: 'p-2 hover:bg-rose-50 rounded-full transition-colors'
+                        }, React.createElement(Settings, { size: 20, className: 'text-slate-500' }))
                     ])
                 ),
+
                 // Main Content
-                React.createElement('main', { className: 'max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-8' }, [
+                React.createElement('main', { className: 'max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-6' }, [
+                    
                     // Coluna Controles
                     React.createElement('div', { className: 'lg:col-span-4 flex flex-col gap-4' }, [
-                        // Erro Box
-                        error && React.createElement('div', { className: 'p-4 bg-red-100 text-red-700 rounded-xl text-sm border border-red-200' }, [
-                            React.createElement('p', null, error),
-                            React.createElement('input', { 
-                                type: 'password', 
-                                placeholder: 'Insira sua API Key aqui...', 
-                                value: customKey, 
+                        
+                        // Painel de Configurações
+                        showSettings && React.createElement('div', { className: 'bg-slate-800 text-white p-4 rounded-xl shadow-xl mb-2' }, [
+                            React.createElement('h3', { className: 'text-xs font-bold uppercase mb-3 opacity-80' }, 'Configurações de API'),
+                            React.createElement('p', { className: 'text-[10px] mb-2 opacity-70' }, 'Necessário apenas para uso fora desta plataforma (ex: GitHub Pages).'),
+                            React.createElement('input', {
+                                type: 'password',
+                                value: customKey,
                                 onChange: (e) => setCustomKey(e.target.value),
-                                className: 'w-full mt-2 p-2 border rounded'
+                                className: 'w-full p-2 bg-slate-700 rounded text-sm border-none focus:ring-1 focus:ring-rose-400 outline-none',
+                                placeholder: 'Cole sua Gemini API Key...'
                             })
                         ]),
-                        // Upload Fundo
-                        React.createElement('div', { className: 'bg-white p-4 rounded-xl shadow-sm border' }, [
-                            React.createElement('h2', { className: 'text-sm font-bold mb-2' }, '1. Cenário (Opcional)'),
-                            React.createElement('div', { 
-                                onClick: () => backgroundInputRef.current.click(),
-                                className: 'border-2 border-dashed p-4 text-center cursor-pointer rounded-lg hover:bg-slate-50'
-                            }, background ? React.createElement('img', { src: background.previewUrl, className: 'h-16 mx-auto object-cover' }) : 'Adicionar Fundo'),
-                            React.createElement('input', { type: 'file', hidden: true, ref: backgroundInputRef, onChange: (e) => handleFileUpload(e, 'background') })
+
+                        // Erro Box
+                        error && React.createElement('div', { className: 'p-4 bg-red-50 text-red-700 rounded-xl text-xs border border-red-200' }, [
+                            React.createElement('div', { className: 'flex gap-2 font-bold' }, [
+                                React.createElement(AlertCircle, { size: 14 }), 'Aviso'
+                            ]),
+                            React.createElement('p', { className: 'mt-1' }, error)
                         ]),
-                        // Upload Caneca
-                        React.createElement('div', { className: 'bg-white p-4 rounded-xl shadow-sm border' }, [
-                            React.createElement('h2', { className: 'text-sm font-bold mb-2' }, '2. Caneca Base'),
-                            React.createElement('div', { 
-                                onClick: () => mockupInputRef.current.click(),
-                                className: 'border-2 border-dashed p-4 text-center cursor-pointer rounded-lg hover:bg-rose-50 border-rose-200'
-                            }, mockupBase ? React.createElement('img', { src: mockupBase.previewUrl, className: 'h-16 mx-auto object-contain' }) : 'Adicionar Caneca'),
-                            React.createElement('input', { type: 'file', hidden: true, ref: mockupInputRef, onChange: (e) => handleFileUpload(e, 'mockup') })
-                        ]),
-                        // Upload Estampa
-                        React.createElement('div', { className: 'bg-white p-4 rounded-xl shadow-sm border' }, [
-                            React.createElement('h2', { className: 'text-sm font-bold mb-2' }, '3. Estampa'),
-                            React.createElement('div', { 
-                                onClick: () => artworkInputRef.current.click(),
-                                className: 'border-2 border-dashed p-4 text-center cursor-pointer rounded-lg hover:bg-slate-50'
-                            }, artwork ? React.createElement('img', { src: artwork.previewUrl, className: 'h-16 mx-auto object-contain' }) : 'Adicionar Arte'),
-                            React.createElement('input', { type: 'file', hidden: true, ref: artworkInputRef, onChange: (e) => handleFileUpload(e, 'artwork') })
-                        ]),
-                        // Botão Ação
+
+                        // Uploads
+                        ['background', 'mockup', 'artwork'].map((type, idx) => {
+                            const labels = ['1. Cenário de Fundo (Opcional)', '2. Caneca Branca (PNG)', '3. Estampa da Caneca'];
+                            const state = type === 'background' ? background : type === 'mockup' ? mockupBase : artwork;
+                            const ref = type === 'background' ? backgroundInputRef : type === 'mockup' ? mockupInputRef : artworkInputRef;
+                            
+                            return React.createElement('div', { key: type, className: 'bg-white p-4 rounded-xl shadow-sm border border-slate-100' }, [
+                                React.createElement('h2', { className: 'text-xs font-bold text-slate-500 mb-2 uppercase' }, labels[idx]),
+                                React.createElement('div', { 
+                                    onClick: () => ref.current.click(),
+                                    className: `border-2 border-dashed p-6 text-center cursor-pointer rounded-lg transition-all ${state ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 hover:border-rose-300 hover:bg-rose-50'}`
+                                }, state 
+                                    ? React.createElement('img', { src: state.previewUrl, className: 'h-20 mx-auto object-contain rounded' })
+                                    : React.createElement('div', { className: 'flex flex-col items-center gap-1 text-slate-400' }, [
+                                        React.createElement(Upload, { size: 24 }),
+                                        React.createElement('span', { className: 'text-xs' }, 'Toque para enviar')
+                                    ])
+                                ),
+                                React.createElement('input', { type: 'file', hidden: true, ref: ref, onChange: (e) => handleFileUpload(e, type) })
+                            ]);
+                        }),
+
                         React.createElement('button', {
                             onClick: generateMockup,
                             disabled: isGenerating,
-                            className: `w-full p-4 rounded-xl font-bold text-white shadow-lg transition ${isGenerating ? 'bg-rose-300' : 'bg-rose-500 hover:bg-rose-600'}`
-                        }, isGenerating ? 'Gerando Mockup...' : 'Criar Mockup Realista')
+                            className: `w-full p-4 rounded-xl font-bold text-white shadow-lg transition-all ${isGenerating ? 'bg-rose-300' : 'bg-rose-500 hover:bg-rose-600 shadow-rose-200'}`
+                        }, isGenerating ? 'A gerar...' : 'Criar Mockup Profissional')
                     ]),
+
                     // Coluna Resultado
-                    React.createElement('div', { className: 'lg:col-span-8 bg-white rounded-2xl shadow-inner border min-h-[400px] flex items-center justify-center p-4' }, 
+                    React.createElement('div', { className: 'lg:col-span-8 bg-white rounded-2xl shadow-sm border border-slate-100 min-h-[500px] flex items-center justify-center p-6 relative overflow-hidden' }, 
                         isGenerating 
-                            ? React.createElement('div', { className: 'text-center' }, [
-                                React.createElement(Loader2, { className: 'w-12 h-12 text-rose-500 animate-spin mx-auto mb-2' }),
-                                React.createElement('p', { className: 'text-slate-500' }, 'Processando arte e luz...')
+                            ? React.createElement('div', { className: 'text-center z-10' }, [
+                                React.createElement(Loader2, { className: 'w-16 h-16 text-rose-500 animate-spin mx-auto mb-4' }),
+                                React.createElement('p', { className: 'text-slate-600 font-semibold' }, 'Sublimando imagens...'),
+                                React.createElement('p', { className: 'text-slate-400 text-sm' }, 'Isto pode levar alguns segundos.')
                             ])
                             : resultImage 
-                                ? React.createElement('div', { className: 'text-center w-full' }, [
-                                    React.createElement('img', { src: resultImage, className: 'max-w-full max-h-[500px] mx-auto rounded shadow-lg mb-4' }),
-                                    React.createElement('button', { 
-                                        onClick: () => { const a = document.createElement('a'); a.href = resultImage; a.download = 'mockup.png'; a.click(); },
-                                        className: 'flex items-center gap-2 mx-auto bg-slate-800 text-white px-6 py-2 rounded-full'
-                                    }, [React.createElement(Download, { size: 16 }), 'Baixar Imagem'])
+                                ? React.createElement('div', { className: 'text-center w-full animate-in fade-in zoom-in duration-500' }, [
+                                    React.createElement('img', { src: resultImage, className: 'max-w-full max-h-[600px] mx-auto rounded-lg shadow-2xl mb-6 border-4 border-white' }),
+                                    React.createElement('div', { className: 'flex justify-center gap-4' }, [
+                                        React.createElement('button', { 
+                                            onClick: () => { const a = document.createElement('a'); a.href = resultImage; a.download = 'meu-mockup.png'; a.click(); },
+                                            className: 'flex items-center gap-2 bg-emerald-600 text-white px-8 py-3 rounded-full font-bold hover:bg-emerald-700 shadow-lg transition'
+                                        }, [React.createElement(Download, { size: 18 }), 'Guardar']),
+                                        React.createElement('button', { 
+                                            onClick: () => setResultImage(null),
+                                            className: 'flex items-center gap-2 bg-slate-100 text-slate-600 px-8 py-3 rounded-full font-bold hover:bg-slate-200 transition'
+                                        }, [React.createElement(RefreshCw, { size: 18 }), 'Novo'])
+                                    ])
                                 ])
                                 : React.createElement('div', { className: 'text-slate-300 text-center' }, [
-                                    React.createElement(ImageIcon, { size: 64, className: 'mx-auto opacity-20 mb-2' }),
-                                    'Aguardando suas imagens...'
+                                    React.createElement(ImageIcon, { size: 80, className: 'mx-auto opacity-10 mb-4' }),
+                                    React.createElement('p', { className: 'text-xl font-medium' }, 'Seu Mockup aparecerá aqui'),
+                                    React.createElement('p', { className: 'text-sm mt-2 opacity-60' }, 'Use os botões à esquerda para começar.')
                                 ])
                     )
                 ])
@@ -225,3 +249,4 @@
     </script>
 </body>
 </html>
+
